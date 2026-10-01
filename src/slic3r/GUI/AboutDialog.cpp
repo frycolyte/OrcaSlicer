@@ -10,6 +10,9 @@
 #include "Widgets/Button.hpp"
 
 #include <wx/clipbrd.h>
+#include <wx/textctrl.h>
+
+#include <algorithm>
 
 namespace Slic3r {
 namespace GUI {
@@ -243,10 +246,6 @@ AboutDialog::AboutDialog()
         // _build_string_font.SetStyle(wxFONTSTYLE_ITALIC);
 
         vesizer->Add(0, 0, 1, wxEXPAND, FromDIP(5));
-        auto          version_string = std::string(SoftFever_VERSION); // _L("Orca Slicer ") + " " + std::string(SoftFever_VERSION);
-        wxStaticText* version = new wxStaticText(this, wxID_ANY, version_string.c_str(), wxDefaultPosition, wxDefaultSize);
-        wxStaticText* credits_string = new wxStaticText(this, wxID_ANY, wxString::Format("Build %s", std::string(GIT_COMMIT_HASH)), wxDefaultPosition, wxDefaultSize);
-        credits_string->SetFont(_build_string_font);
         wxFont version_font = GetFont();
         #ifdef __WXMSW__
 			version_font.SetPointSize(version_font.GetPointSize()-1);
@@ -254,15 +253,43 @@ AboutDialog::AboutDialog()
             version_font.SetPointSize(11);
         #endif
         version_font.SetPointSize(20);
-        version->SetFont(version_font);
-        version->SetForegroundColour(wxColour("#949494"));
-        credits_string->SetForegroundColour(wxColour("#949494"));
-        version->SetBackgroundColour(wxColour("#FFFFFF"));
-        credits_string->SetBackgroundColour(wxColour("#FFFFFF"));
 
-        vesizer->Add(version, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
-        vesizer->AddSpacer(FromDIP(5));
-        vesizer->Add(credits_string, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
+        auto create_selectable_version_text = [this](const wxString& version_label, const wxFont& version_font,
+                                                     const wxString& build_label, const wxFont& build_font) {
+            const wxString label = version_label + "\n" + build_label;
+            auto* text = new wxTextCtrl(this, wxID_ANY, label, wxDefaultPosition, wxDefaultSize,
+                                        wxTE_MULTILINE | wxTE_READONLY | wxBORDER_NONE | wxTE_RIGHT | wxTE_NO_VSCROLL);
+            text->SetBackgroundColour(wxColour("#FFFFFF"));
+            text->SetForegroundColour(wxColour("#949494"));
+            text->SetFont(build_font);
+
+            wxTextAttr version_style(wxColour("#949494"));
+            version_style.SetFont(version_font);
+            text->SetStyle(0, version_label.length(), version_style);
+
+            wxTextAttr build_style(wxColour("#949494"));
+            build_style.SetFont(build_font);
+            text->SetStyle(version_label.length() + 1, label.length(), build_style);
+
+            wxClientDC dc(text);
+            dc.SetFont(version_font);
+            const wxSize version_size = dc.GetTextExtent(version_label);
+            dc.SetFont(build_font);
+            const wxSize build_size = dc.GetTextExtent(build_label);
+            text->SetMinSize(wxSize(std::max(version_size.x, build_size.x) + FromDIP(8),
+                                    version_size.y + build_size.y + FromDIP(14)));
+
+            return text;
+        };
+
+        const auto version_string = wxString::FromUTF8(std::string(SoftFever_VERSION));
+        wxTextCtrl* version_build_string = create_selectable_version_text(
+            version_string,
+            version_font,
+            wxString::Format("Build %s", std::string(GIT_COMMIT_HASH)),
+            _build_string_font);
+
+        vesizer->Add(version_build_string, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
         vesizer->Add(0, 0, 1, wxEXPAND, FromDIP(5));
     }
 
